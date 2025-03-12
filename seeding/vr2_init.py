@@ -3,7 +3,7 @@ import struct
 
 from utils import index_by, resign_seeds, store_at_index, str_to_bytes
 
-def create_seed_array_1(seed0: int = 0x1571, seed1: int = 1):
+def create_seed_array_1(seed0, seed1: int = 1):
     result_arr = bytearray()
     
     for i in range(0, 0x9BC, 4):
@@ -21,6 +21,8 @@ def update_array_1(array_1: bytearray):
     raise NotImplementedError(f"Not Yet reversed. MK11.exe+B930CC")
 
 def create_seed_array_2():
+    global GLOBAL_ARRAY
+    GLOBAL_ARRAY[0] = 1
     v21 = []
     v2 = 1e-7
     _double = 2791064867574.0
@@ -45,8 +47,9 @@ def create_seed_array_2():
     ]:
         v21.append(r & 0xFFFFFFFF)
 
-    v4 = v6 = v19 = 0
-    v5 = v21
+    # Copying something, I think it's safe to ignore
+    # v4 = v6 = v19 = 0
+    # v5 = v21
     # for i in range(len(v21)): # idk what this is doing. It seems to be copying the values but sometimes it's not
     #     if v4 == v6:
     #         something = sub_7ff7B60D25B0(v6, v5)
@@ -59,9 +62,29 @@ def create_seed_array_2():
 
     v23 = bytearray()
 
+    v7 = 0
     B16DA0_CreateRandomArray(v21, v23, 0x9C0) # v24 was only used as maximum size
     # with open("v23.bin", "wb") as f:
     #     f.write(v23)
+
+    v9_idx = 0
+    new_array = bytearray([0]*(0x9C0-4))
+    for v8 in range(0x270): # Seems to be shifting everything backwards # Update: It is actually copying v23 into the global array proper index -1, -1 cuz 0x9C0 is actually greate than the size by 1
+        v10 = index_by(v23, v9_idx)
+        if v8 == 0:
+            GLOBAL_ARRAY[2] = v10 # before this, it was 0x1571 which is seed0 of create_seed_array_1
+        else:
+            store_at_index(new_array, v9_idx - 1, v10)
+        v11 = v7 | v10
+        v7 = v10 >> 31
+        if v8:
+            v7 = v11
+        v9_idx += 1  # next index
+    
+    GLOBAL_ARRAY[3] = new_array
+
+    with open("v23_2.bin", "wb") as f:
+        f.write(GLOBAL_ARRAY[3])
 
 def B16DA0_CreateRandomArray(seeds, some_memory, size):
     elements_count = (size >> 2) & 0xFFFFFFFF # Elements count of some_memory, number of ints
@@ -158,7 +181,14 @@ def B16DA0_CreateRandomArray(seeds, some_memory, size):
             store_at_index(a2, v27, (v28 - v27) & 0xFFFFFFFF)
 
 
+GLOBAL_ARRAY = [ # Replace with a bytes array
+    0x00000000,  # 0x00
+    0x00000270,  # 0x04
+    0x00001571,  # 0x08
+    bytearray(),  # 0x0C # Size 0x9C0
+    bytearray(),  # 0x9C8 # Size 0x9C8
+    "ptr_to_vr2_seed_array",
+]
 if __name__ == "__main__":
-    # result = create_array_1(0x1571, 1)
-    # print(result[:4])
+    create_seed_array_1(GLOBAL_ARRAY[2], 1)
     create_seed_array_2()
