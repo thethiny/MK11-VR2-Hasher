@@ -46,9 +46,16 @@ def combine_bytes(value_size: int, *values):
     return packed_data
 
 
-def str_to_bytes(string, r13):
-    val = struct.unpack_from("<I", string, r13)[0]
+def str_to_bytes(bytearray, offset):
+    val = struct.unpack_from("<I", bytearray, offset)[0]
     return val
+
+def index_by(bytearray, index, size: int = 4):
+    val = str_to_bytes(bytearray, index * size)
+    return val
+
+def store_at_index(bytearray, index, value, size: int = 4):
+    struct.pack_into("<I", bytearray, index * size, value)
 
 def get_bitmask_ff(size: int):
     # Create a bitmask based on size (e.g., 0xFF for 1 byte, 0xFFFF for 2 bytes, etc.)
