@@ -1,6 +1,11 @@
 import os
 import struct
 from typing import Union
+try:
+    import pymem
+    PYMEM_ENABLED = True
+except ImportError:
+    PYMEM_ENABLED = False
 
 def ROL4(value, shift):
     value &= 0xFFFFFFFF
@@ -115,3 +120,71 @@ def pad_string(string: str, pad_length: int = 12) -> str:
         return string + PAD_ALPHA[: pad_length - (len(string) % pad_length)]
 
     return string
+
+def dump(*arrays: Union[bytearray, bytes], name: str):
+    if not name.lower().endswith(".bin"):
+        name += ".bin"
+    array = bytearray()
+    for a in arrays:
+        array += a
+    with open(name, "wb") as f:
+        f.write(array)
+
+if PYMEM_ENABLED:
+    def dump_memory(process_name, address, length, filename=None):
+        try:
+            pm = pymem.Pymem(process_name)
+            data = pm.read_bytes(address, length)
+
+            if filename is None:
+                filename = f"{process_name}_{hex(address)}-{hex(length)}.bin"
+
+            dump(data, name=filename)
+            print(f"Memory dumped to {filename}")
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+
+    def compare_memory(expected_bytes, process_address, process_name: str = "mk11.exe", all=False):
+        try:
+            pm = pymem.Pymem(process_name)
+            actual_bytes = pm.read_bytes(process_address, len(expected_bytes))
+
+            # Size check
+            if len(actual_bytes) != len(expected_bytes):
+                print(
+                    f"Size mismatch: Expected {len(expected_bytes)}, Found {len(actual_bytes)}"
+                )
+                if len(actual_bytes) > len(expected_bytes):
+                    print("Memory is bigger than expected.")
+                else:
+                    print("Memory is smaller than expected.")
+                return
+
+            # Compare bytes
+            mismatches = []
+            start = None
+            for i, (exp, act) in enumerate(zip(expected_bytes, actual_bytes)):
+                if exp != act:
+                    if start is None:
+                        start = i
+                else:
+                    if start is not None:
+                        mismatches.append((start, i - 1))
+                        if not all:
+                            print(f"Mismatch at bytes {start}-{i - 1}")
+                            return
+                        start = None
+
+            if start is not None:
+                mismatches.append((start, len(expected_bytes) - 1))
+
+            if mismatches:
+                for start, end in mismatches:
+                    print(f"Mismatch at bytes {start}-{end}")
+            else:
+                print("Memory contents are identical.")
+
+        except Exception as e:
+            print(f"Error: {e}")
