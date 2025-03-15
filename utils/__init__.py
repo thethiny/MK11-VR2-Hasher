@@ -145,7 +145,6 @@ if PYMEM_ENABLED:
         except Exception as e:
             print(f"Error: {e}")
 
-
     def compare_memory(expected_bytes, process_address, process_name: str = "mk11.exe", all=False):
         try:
             pm = pymem.Pymem(process_name)
@@ -188,3 +187,44 @@ if PYMEM_ENABLED:
 
         except Exception as e:
             print(f"Error: {e}")
+
+
+def compare_bytearrays(expected_bytes: bytearray, actual_bytes: bytearray, all=False):
+    try:
+        # Size check
+        if len(actual_bytes) != len(expected_bytes):
+            print(
+                f"Size mismatch: Expected {len(expected_bytes)}, Found {len(actual_bytes)}"
+            )
+            if len(actual_bytes) > len(expected_bytes):
+                print("Memory is bigger than expected.")
+            else:
+                print("Memory is smaller than expected.")
+            return
+
+        # Compare bytes
+        mismatches = []
+        start = None
+        for i, (exp, act) in enumerate(zip(expected_bytes, actual_bytes)):
+            if exp != act:
+                if start is None:
+                    start = i
+            else:
+                if start is not None:
+                    mismatches.append((start, i - 1))
+                    if not all:
+                        print(f"Mismatch at bytes {start}-{i - 1}")
+                        return
+                    start = None
+
+        if start is not None:
+            mismatches.append((start, len(expected_bytes) - 1))
+
+        if mismatches:
+            for start, end in mismatches:
+                print(f"Mismatch at bytes {start}-{end}")
+        else:
+            print("Bytearrays are identical.")
+
+    except Exception as e:
+        print(f"Error: {e}")
