@@ -9,7 +9,7 @@ CONST_31FC940_VALUES = {
     0x0: 0x2585246C550,  # Pointer to some seeding values
     0x8: 0x2585246C560,  # Pointer to previous hash
     0x10: 0x2585246C560,  # Pointer to previous hash
-    0x18: 0xC1220A4F, # 1st time 0x1D151DED,  # Value # 2nd time it was C1220A4F
+    0x18: 0xC1220A4F,  # 1st time 0x1D151DED,  # Value # 2nd time it was C1220A4F # custom seed was 2246651937
     # 0x1C: 0x64697272, # Useless data
     0x20: 0x25853874CE0,  # Random Bytes Array # Used for seeding maybe? I noticed that this is different every run so I'm unsure how the hash is the same
     0x28: 2000000,  # Random Bytes Size?
@@ -17,10 +17,10 @@ CONST_31FC940_VALUES = {
 }
 CONST_31FC940_POINTERS = {
     0x0: {
-        0x00: 0xC12DD270, # First Time 0x1D05C9BA, # 2nd time it was 0xC1DD270  # Need to find a way to automate these or figure out if they're static or not
-        0x04: 0xC127CE59, # First Time 0x1D1F0286, # 2nd time it was C127CE59
-        0x08: 0xC12961C7, # First Time 0x1D020ED5, # 2nd time it was C12961C7
-        0x0C: 0xC136C938, # First Time 0x1D10B785, # 2nd Time it was C136C938
+        0x00: 0xC12DD270,  # First Time 0x1D05C9BA, # 2nd time it was 0xC12DD270 # Custom seed was 2247883720
+        0x04: 0xC127CE59,  # First Time 0x1D1F0286, # 2nd time it was C127CE59  # Custom seed was 2248031539
+        0x08: 0xC12961C7,  # First Time 0x1D020ED5, # 2nd time it was C12961C7  # Custom seed was 2246879723
+        0x0C: 0xC136C938,  # First Time 0x1D10B785, # 2nd Time it was C136C938  # Custom seed was 2246434811
     },
     0x20: {
         0x171338: 0xA7D00BAA,  # 1st time it changed and address changed
@@ -29,10 +29,19 @@ CONST_31FC940_POINTERS = {
         0x0B6B8C: 0x928EBD82,  # 2nd time it changed and address changed
         0x05C416: 0x6C63BF6F,
         0x05C41A: 0xD15DAAE7,
-        0x14C377: 0x500b7FCC,
+        0x14C377: 0x500B7FCC,
         0x14C37B: 0xBAA82899,
         0x0FD83F: 0xF3A531EE,
         0x0FD843: 0x8E54E732,
+        # Custom Seeds
+        1231849: 4068612868,
+        1231853: 2407823303,
+        1510674: 2351425458,
+        1510678: 3501585905,
+        367050: 1254869655,
+        367054: 3050537601,
+        847834: 3608359765,
+        847838: 2286300682,
     },
 }
 
