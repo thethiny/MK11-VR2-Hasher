@@ -2,22 +2,23 @@ from datetime import datetime
 import struct
 from typing import Literal, Union
 
-from utils import index_by, resign_seeds, store_at_index, dump, PYMEM_ENABLED
+from utils import compare_bytearrays, index_by, resign_seeds, store_at_index, dump, PYMEM_ENABLED
 if PYMEM_ENABLED:
     from utils import compare_memory, dump_memory
 
-def create_seed_array_1(seed0, seed1: int = 1):
+def initialize_state(seed):
     result_arr = bytearray()
 
-    for i in range(0, 0x9BC, 4):
-        seed0 = seed1 + ((0x6C078965 * (seed0 ^ (seed0>>30))) & 0xFFFFFFFF)
-        seed0 &= 0xFFFFFFFF
-        seed1 += 1
-        result_arr.extend(struct.pack("<I", seed0))
+    for i in range(1, 0x9C0 // 4):
+        seed = i + ((1812433253 * (seed ^ (seed >> 30))) & 0xFFFFFFFF)
+        seed &= 0xFFFFFFFF
+        result_arr.extend(struct.pack("<I", seed))
 
-    GLOBAL_ARRAY[3] = result_arr # Or can directly edit the array by indexing at seed1
+    GLOBAL_ARRAY[3] = result_arr  # Or can directly edit the array by indexing at seed1
+    GLOBAL_ARRAY[1] = 0x270
 
     return GLOBAL_ARRAY
+
 
 def update_array_1(array_1: bytearray):
     raise NotImplementedError(f"Not Yet reversed. MK11.exe+B930CC")
@@ -48,24 +49,21 @@ def recreate_seed_array_1():
     ]:
         v21.append(r & 0xFFFFFFFF)
 
-    v23 = bytearray()
     v7 = 0
 
-    B16DA0_CreateRandomArray(v21, v23, 0x9C0) # v24 was only used as maximum size
+    v23 = B16DA0_CreateRandomArray(v21, 0x9C0) # v24 was only used as maximum size
 
-    v9_idx = 0
-    new_array = bytearray([0]*(0x9C0-4))
+    new_array = bytearray(0x9C0-4)
     for v8 in range(0x270): # Seems to be shifting everything backwards # Update: It is actually copying v23 into the global array proper index -1, -1 cuz 0x9C0 is actually greate than the size by 1
-        v10 = index_by(v23, v9_idx)
+        v10 = index_by(v23, v8)
         if v8 == 0:
             GLOBAL_ARRAY[2] = v10 # before this, it was 0x1571 which is seed0 of create_seed_array_1
         else:
-            store_at_index(new_array, v9_idx - 1, v10)
+            store_at_index(new_array, v8 - 1, v10)
         v11 = v7 | v10
         v7 = v10 >> 31
         if v8:
             v7 = v11
-        v9_idx += 1  # next index
     # Instead of all this, I can do global array 2 = first element, shift everything backwards once, and then store that
 
     GLOBAL_ARRAY[3] = new_array
@@ -77,9 +75,8 @@ def recreate_seed_array_1():
     result_array = B17320_CreateRandomArray2(2_000_000, 4)
     
     __store_global_array(0x272*2, result_array)
-    
 
-    
+
 def B17320_CreateRandomArray2(array_size: int, element_size: int):
     seed_idx = 1
     XOR_Seeds = [
@@ -292,7 +289,8 @@ def __heavy_xor_complex(initial_index, range_: int, index_offset,
 def B190B0(seed_idx: int):
     v3 = __index_by_global_array(seed_idx)
     if v3 == 0x270: # Array 2
-        __heavy_xor_complex(seed_idx +2, 0x270, 0x18C, 2, 1, 0x26F, 0, -1)
+        # __heavy_xor_complex(seed_idx +2, 0x270, 0x18C, 2, 1, 0x26F, 0, -1)
+        __heavy_xor_complex(seed_idx + 1, 0x270, 0x18D, 1, 2, 0x270, 0, 1)
         v3 = __index_by_global_array(seed_idx)
     elif v3 >= 0x4E0: # Array 3
         __heavy_xor_complex(seed_idx + 0x271, 0xE3, 0x18D, 1, 2, -0x270, 0, 1)
@@ -314,51 +312,45 @@ def B190B0(seed_idx: int):
 
     temp4 = (((v15 & 0xFFFFDF8C) << 15) & 0xFFFFFFFF)
     temp5 = temp4 ^ v15
-    
+
     ret = temp5 ^ (temp5 >> 0x12)
     return ret & 0xFFFFFFFF
 
 
-def B16DA0_CreateRandomArray(seeds, some_memory, size):
+def B16DA0_CreateRandomArray(seeds, size):
     elements_count = (size >> 2) & 0xFFFFFFFF # Elements count of some_memory, number of ints
     if not size:
-        return
+        raise ValueError(f"Missing size!")
+
+    random_seeds_length = len(seeds)
     
-    random_seeds_length = (len(seeds) * 4) >> 2 # distance between seeds 0 and 1, idk how else to get the value from. I assume it's size of seeds
-    random_seeds_length &= 0xFFFFFFFF
-    # v5 is now len(seeds)
-    if elements_count < 0x26F:
-        if elements_count < 0x44:
-            if elements_count < 0x27:
-                if elements_count < 7:
-                    v6 = (elements_count - 1) >> 1
-                else:
-                    v6 = 3
-            else:
-                v6 = 5
-        else:
-            v6 = 7
+    if elements_count < 7:
+        v6 = (elements_count - 1) >> 1
+    elif elements_count < 0x27:
+        v6 = 3
+    elif elements_count < 0x44:
+        v6 = 5
+    elif elements_count < 0x26F:
+        v6 = 7
     else:
         v6 = 11
 
-    v7 = random_seeds_length + 1
+    v7 = max(elements_count, random_seeds_length + 1)
     v8 = (elements_count - v6) >> 1
     v9 = v32 = v8 + v6
-    if elements_count > random_seeds_length:
-        v7 = elements_count
 
-    a2 = some_memory
+    state_array = bytearray()
     for _ in range(elements_count):
-        some_memory.extend(struct.pack("<I", 0x8B8B8B8B))
-    
+        state_array.extend(struct.pack("<I", 0x8B8B8B8B))
+
     loop_counter = 0
     if (v7):
         while (loop_counter < v7):
             v13 = (loop_counter + v8) % elements_count
-            v14 = index_by(a2, v13)
+            v14 = index_by(state_array, v13)
             v15_idx = loop_counter % elements_count
-            v15 = index_by(a2, v15_idx)
-            temp = index_by(a2, (loop_counter - 1) % elements_count)
+            v15 = index_by(state_array, v15_idx)
+            temp = index_by(state_array, (loop_counter - 1) % elements_count)
             v16 = 0x19660D * (v15 ^ v14 ^ temp ^ ((v15 ^ v14 ^ temp) >> 27))
             v16 &= 0xFFFFFFFF
             if loop_counter:
@@ -372,15 +364,15 @@ def B16DA0_CreateRandomArray(seeds, some_memory, size):
                 v17 = random_seeds_length
             v18 = v17 + v16
             v18 &= 0xFFFFFFFF
-            store_at_index(a2, v13, (v14 + v16) & 0xFFFFFFFF)
+            store_at_index(state_array, v13, (v14 + v16) & 0xFFFFFFFF)
             v19 = loop_counter + v32
             v19 &= 0xFFFFFFFF
             loop_counter += 1
             loop_counter &= 0xFFFFFFFF
-            store_val = index_by(a2, v19 % elements_count) + v18
+            store_val = index_by(state_array, v19 % elements_count) + v18
             store_val &= 0xFFFFFFFF
-            store_at_index(a2, v19 % elements_count, store_val)
-            store_at_index(a2, v15_idx, v18)
+            store_at_index(state_array, v19 % elements_count, store_val)
+            store_at_index(state_array, v15_idx, v18)
 
         v9 = v32
 
@@ -394,12 +386,12 @@ def B16DA0_CreateRandomArray(seeds, some_memory, size):
         v30 = v20 - 1 # Should start with a do while, but python doesn't support it, so I need to make sure I can enter
         while v30 < v20:
             v24 = ((v22 + v21)&0xFFFFFFFF) % elements_count
-            v25 = index_by(a2, v24)
+            v25 = index_by(state_array, v24)
             v26_idx = v24
             v27 = (v21 + 1) & 0xFFFFFFFF
             v27 %= elements_count
-            temp1 = index_by(a2, v27)
-            temp2 = index_by(a2, v21 % elements_count)
+            temp1 = index_by(state_array, v27)
+            temp2 = index_by(state_array, v21 % elements_count)
             temp_val = v25 + temp1 + temp2
             temp_val &= 0xFFFFFFFF
             v28 = 0x5D588B65 * (temp_val ^ (temp_val >> 27))
@@ -408,9 +400,20 @@ def B16DA0_CreateRandomArray(seeds, some_memory, size):
             v29 %= elements_count
             v30 = v21 + 2
             v21 += 1
-            store_at_index(a2, v26_idx, v28 ^ v25)
-            store_at_index(a2, v29, index_by(a2, v29) ^ ((v28 - v27) & 0xFFFFFFFF))
-            store_at_index(a2, v27, (v28 - v27) & 0xFFFFFFFF)
+            store_at_index(state_array, v26_idx, v28 ^ v25)
+            store_at_index(state_array, v29, index_by(state_array, v29) ^ ((v28 - v27) & 0xFFFFFFFF))
+            store_at_index(state_array, v27, (v28 - v27) & 0xFFFFFFFF)
+
+    return state_array
+
+
+def validate_memories(xor_loc: int, arr1_loc: int = 0x1431FB5BC):
+    compare_memory(GLOBAL_ARRAY[3], arr1_loc)
+    compare_memory(GLOBAL_ARRAY[4], arr1_loc + (0x9C0-4))
+    # compare_memory(GLOBAL_ARRAY[7][5], xor_loc)
+    with open("xors.bin", "rb") as f:
+        xors = bytearray(f.read())
+        compare_bytearrays(GLOBAL_ARRAY[7][5], xors)
 
 
 GLOBAL_ARRAY = [ # Replace with a bytes array
@@ -424,5 +427,20 @@ GLOBAL_ARRAY = [ # Replace with a bytes array
     "ptr_to_vr2_seed_array",
 ]
 if __name__ == "__main__":
-    create_seed_array_1(GLOBAL_ARRAY[2], 1)
-    recreate_seed_array_1() # TODO: This actually also creates array 1. I'm unsure what's the point of the previous one then! Seems to be init
+    initialize_state(GLOBAL_ARRAY[2])
+    recreate_seed_array_1()
+
+    validate_memories(0xD9D4CE0)
+
+    # Get seeds for hash
+    # for seed in [
+    #     1231849, 1510674, 367050, 847834,
+    # ]:
+    #     print("Seed", seed)
+
+    #     val = index_by(GLOBAL_ARRAY[7][5], seed, 1)
+    #     val2 = index_by(GLOBAL_ARRAY[7][5], seed+4, 1)
+    #     print()
+    #     print(f"{seed}: {val},")
+    #     print(f"{seed+4}: {val2},")
+    #     print(hex(val ^ val2))
