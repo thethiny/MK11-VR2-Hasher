@@ -74,10 +74,14 @@ def recreate_seed_array_1():
         GLOBAL_ARRAY[2] = -1 & 0xFFFFFFFF
     GLOBAL_ARRAY[1] = 0x270
 
-    result_array = B17320_CreateRandomArray2(2_000_000, 4, seed_idx = 1) # 1 is an index in global array
+    result_array = B17320_CreateRandomArray2(2_000_000, 4)
+    
+    __store_global_array(0x272*2, result_array)
+    
 
-    # apparently, seed isn't seed, it's the global array. Remove from function.
-def B17320_CreateRandomArray2(array_size: int, element_size: int, seed_idx: int):
+    
+def B17320_CreateRandomArray2(array_size: int, element_size: int):
+    seed_idx = 1
     XOR_Seeds = [
         0, 0, 0, 0 # 4 bytes each
     ]
@@ -242,7 +246,7 @@ def __idx_global_array(index: int, offset):
         return index_array, idx
 
 
-def __store_global_array(index: int, value: int, offset: int = 0):
+def __store_global_array(index: int, value, offset: int = 0):
     index_array, index = __idx_global_array(index, offset)
     if isinstance(index_array, bytearray):
         store_at_index(index_array, index, value)
@@ -282,39 +286,6 @@ def __heavy_xor_complex(initial_index, range_: int, index_offset,
             store_val_r = 0x9908B0DF
 
         __store_global_array(initial_index + store_offset, store_val_l ^ store_val_r)
-
-        initial_index += 1
-
-def __heavy_xor_left(initial_index, range_: int, index_offset, store_offset = 0x26F, idx_1_offset: int = 0, idx_2_offset: int = -1):
-    """
-    store_offset and index_offset must be +1 since I moved the ++ to the end instead of the middle
-    """
-    for _ in range(range_):
-        idx_1 = __index_by_global_array(initial_index + idx_1_offset)
-        idx_2 = __index_by_global_array(initial_index + idx_2_offset)
-        
-        temp_xor = idx_1 ^ idx_2
-        store_val_l = ((idx_2 ^ temp_xor & 0x7FFFFFFF) >> 1) ^ __index_by_global_array(initial_index + index_offset)
-        store_val_r = 0
-        if ((idx_2 ^ temp_xor) & 1) != 0:
-            store_val_r = 0x9908B0DF
-            
-        __store_global_array(initial_index + store_offset, store_val_l ^ store_val_r)
-        
-        initial_index += 1
-
-def __heavy_xor_right(initial_index, range_, index_offset, store_offset = -0x270, idx_1_offset: int = 0, idx_2_offset: int = 1):
-    for _ in range(range_):
-        idx_1 = __index_by_global_array(initial_index + idx_1_offset)
-        idx_2 = __index_by_global_array(initial_index + idx_2_offset)
-
-        temp_xor = idx_1 ^ idx_2
-        store_val_l = ((idx_1 ^ temp_xor & 0x7FFFFFFF) >> 1) ^ __index_by_global_array(initial_index + index_offset)
-        store_val_r = 0
-        if idx_2 & 1 != 0:
-            store_val_r = 0x9908B0DF
-
-        __store_global_array(initial_index + store_offset, store_val_l ^ store_val_r) # Starts at 1st Array start (0x08 not 0C) which is global_array[2]
 
         initial_index += 1
 
