@@ -185,7 +185,7 @@ class MT19937:
             raise ValueError(f"Expecting at least 1 n")
 
         factor = 1e-7
-        seed_1 = 0x41987E9DB71 # Unsure how to create, research later
+        seed_1 = 0x41987E9DB71 # Unsure how to create, research later # High Resolution Time Since PC Up, replace with something else
         time_factor = seed_1 * factor
         ts = int(datetime.now().timestamp()) & 0xFFFFFFFF
         ts *= time_factor 
@@ -206,9 +206,8 @@ class MT19937:
         array_elements_count = array_size >> 2
         xor_array = bytearray(array_size)
         for v10 in range(array_elements_count):
-            store_at_index(xor_array, v10, self.twist())
+            store_at_index(xor_array, v10, self.random())
 
-        next_xor_index = next_xor_index_2 = 0
         self.xor_key = 0
 
         v12 = 0
@@ -216,20 +215,12 @@ class MT19937:
             v14 = (array_size // element_size - 20) >> 1
             v15 = array_size - 20
             for v13 in range(element_size):
-                v27 = self.twist()
+                v27 = self.random()
                 v12 += v14 + v27 % v14 + 0x14
-                # v67 = v12
 
                 if v12 > v15:
                     return
 
-                # v28 = next_xor_index
-                # if next_xor_index_2 == next_xor_index:
-                # next_xor_index, next_xor_index_2 = self.store_xor_const(v28, v67, next_xor_index, next_xor_index_2)
-                #     v12 = v67
-                # else:
-                #     v28 = v12
-                #     next_xor_index_2 += 1
                 self.xor_consts[v13] = v12
 
         v29 = 4 * element_size
@@ -238,8 +229,8 @@ class MT19937:
             return
 
         for _ in range(v29):
-            v43 = self.twist() % element_size
-            v55 = self.twist() % element_size
+            v43 = self.random() % element_size
+            v55 = self.random() % element_size
             if v43 != v55:
                 v56 = self.xor_consts[v55]
                 v57 = self.xor_consts[v43]
@@ -247,7 +238,7 @@ class MT19937:
                 self.xor_consts[v55] = v57
                 self.xor_consts[v43] = v56
 
-        v59 = self.twist()
+        v59 = self.random()
         self.xor_key = v59
         s_size = self.unsigned_to_signed(element_size)
         if s_size > 0 and element_size >= 0x10:
@@ -258,10 +249,10 @@ class MT19937:
 
         return xor_array
 
-    def twist(self):
+    def random(self):
         if self.state_index == self.n:
             self.complex_xor(self.n, 0, self.m, self.n)
-        elif self.state_index >= self.n*2:  # Array 3
+        elif self.state_index >= self.n*2:
             self.complex_xor(self.n - self.m, self.n, self.m, -self.n)
             self.complex_xor(self.m - 1, self.n * 2 - self.m, -(self.n * 2 - self.m), -self.n)
             self.complex_xor(1, self.n * 2 - 1, self.m, self.n, allow_overflow=True)
@@ -318,22 +309,22 @@ class MT19937:
 
         return store_at_index(self.temp_state_array, state_idx - self.n, value)
 
-    def derive_new_keys_from_string(self, encryption_string: bytes):
+    def derive_new_keys_from_string_old(self, encryption_string: bytes):
         """
         Short implementation of MK11.exe+B1AD50
         """
         v3 = b""
         v4 = 0
-        v5 = len(encryption_string)
+        string_length = len(encryption_string)
         v6 = 0
-        if v5:
-            v7 = v5 - 1
-            if v5 - 1 > 0x28:
-                if v5 - 0x17 >= 0:
+        if string_length:
+            v7 = string_length - 1
+            if string_length - 1 > 0x28:
+                if string_length - 0x17 >= 0:
                     v9 = -1
-                    if v5 - 0x17 < v7:
+                    if string_length - 0x17 < v7:
                         v9 = -23
-                    v8 = v5 + v9
+                    v8 = string_length + v9
                 else:
                     v8 = 0
                 v10 = v7 - v8
@@ -393,6 +384,48 @@ class MT19937:
             index = self.xor_key ^ self.xor_consts[i]
             r_val = index_by(self.xor_array, index + 4, 1)
             store_at_index(self.xor_array, index, r_val ^ n_k, 1)
+            
+    def derive_new_keys_from_string(self, encryption_string: bytes):
+        """
+        Short implementation of MK11.exe+B1AD50
+        """
+        length = len(encryption_string)
+
+        # Extract a sub-sequence from encryption_string based on length constraints
+        if length and length - 1 > 0x28:
+            offset = -23 if length - 0x17 < (length - 1) else -1
+            start_idx = max(length + offset, 0)
+            copy_length = min((length - 1) - start_idx, 12)
+            extracted_bytes = encryption_string[start_idx + 1 : start_idx + 1 + copy_length] if copy_length else b""
+        else:
+            extracted_bytes = b""
+
+        # Generate keys from extracted_bytes using _key_seed_from_str
+        key_seed_1 = self._key_seed_from_str(extracted_bytes, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
+        key_seed_2 = self._key_seed_from_str(extracted_bytes, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
+        key_seed_3 = self._key_seed_from_str(extracted_bytes, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
+        key_seed_4 = self._key_seed_from_str(extracted_bytes, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
+
+        # Compute intermediate XOR operations
+        xor_1 = key_seed_1 ^ key_seed_2
+        xor_2 = key_seed_3 ^ key_seed_2
+        xor_3 = key_seed_3 ^ key_seed_4
+        xor_4 = xor_1 ^ key_seed_4
+
+        # Compute final keys
+        new_keys = [
+            xor_1 ^ 0x77E56F3D,
+            xor_2 ^ 0x250A0D57,
+            xor_3 ^ 0xA4CA9627,
+            xor_4 ^ 0x9414718A
+        ]
+
+        # Store computed keys using XOR-indexing
+        for i, key in enumerate(new_keys):
+            index = self.xor_key ^ self.xor_consts[i]
+            stored_value = index_by(self.xor_array, index + 4, 1)
+            store_at_index(self.xor_array, index, stored_value ^ key, 1)
+
 
     def get_keys(self):
         keys = []
