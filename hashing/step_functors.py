@@ -156,7 +156,7 @@ def functor_B1E180_3d5686a6(v48: int, seed3: int, seed1: int, seed2: int, v120: 
     else:
         v7 = CONST_31FC940_VALUES[0x18] ^ CONST_31FC940_POINTERS[0][0]
         v3 = CONST_31FC940_POINTERS[0x20][v7] ^ CONST_31FC940_POINTERS[0x20][v7 + 4]
-        # Value was 0x7DF14FDC
+        # Value was 0x7DF14FDC # UNSURE When I checked again it was 7DF1D6DC!
 
     seed1 ^= v3
     seed1 = test_overflow_def(seed1, "+")
@@ -247,7 +247,7 @@ def functor_B1E170_20fb6053(seed3: int, seed2: int, seed1: int, seed4: int, v120
     else:
         v27 = CONST_31FC940_VALUES[0x18] ^ CONST_31FC940_POINTERS[0][0xC]
         v28 = CONST_31FC940_POINTERS[0x20][v27] ^ CONST_31FC940_POINTERS[0x20][v27 + 4]
-        # Was 0xEAA35755 after this
+        # Was 0xEAA35755 after this # This was always the same
 
     seed3 ^= v28
 
