@@ -5,7 +5,6 @@ from typing import List
 import numpy as np
 
 
-
 def dump(*arrays, name: str):
     if not name.lower().endswith(".bin"):
         name += ".bin"
@@ -50,6 +49,8 @@ class MT19937:
     l = 18
     f = 1812433253
 
+    DEFAULT_SEED = 0x1571
+
     def __init__(self):
         self.init = False
         self.state_index = 0
@@ -57,7 +58,7 @@ class MT19937:
         self.xor_consts = [0]*4
         self.xor_array = bytearray()
 
-    def initialize_state(self, seed: int = 0x1571):
+    def initialize_state(self, seed: int = DEFAULT_SEED):
         result_arr = bytearray()
         for i in range(1, self.n):
             seed = ((self.f * (seed ^ (seed >> (self.w-2)))) & 0xFFFFFFFF) + i
@@ -67,7 +68,6 @@ class MT19937:
         self.state_array = result_arr
         self.state_index = self.n
         self.temp_state_array = bytearray(self.n*4)
-
 
     def create_randoms_array(self, seeds: List[int]):
         size = self.n * 4
@@ -225,7 +225,7 @@ class MT19937:
 
                 # v28 = next_xor_index
                 # if next_xor_index_2 == next_xor_index:
-                    # next_xor_index, next_xor_index_2 = self.store_xor_const(v28, v67, next_xor_index, next_xor_index_2)
+                # next_xor_index, next_xor_index_2 = self.store_xor_const(v28, v67, next_xor_index, next_xor_index_2)
                 #     v12 = v67
                 # else:
                 #     v28 = v12
@@ -317,7 +317,7 @@ class MT19937:
             return store_at_index(self.state_array, state_idx, value)
 
         return store_at_index(self.temp_state_array, state_idx - self.n, value)
-    
+
     def get_keys(self):
         keys = []
         for key in self.xor_consts:
