@@ -12,7 +12,7 @@ CONST_31FC940_VALUES = {
     0x18: 0xC1220A4F,  # 1st time 0x1D151DED,  # Value # 2nd time it was C1220A4F # custom seed was 2246651937
     # 0x1C: 0x64697272, # Useless data
     0x20: 0x25853874CE0,  # Random Bytes Array # Used for seeding maybe? I noticed that this is different every run so I'm unsure how the hash is the same
-    0x28: 2000000,  # Random Bytes Size?
+    0x28: 2000000,  # Random Bytes Size
     0x2C: 0,
 }
 CONST_31FC940_POINTERS = {
