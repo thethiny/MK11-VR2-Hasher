@@ -282,7 +282,7 @@ class MT19937:
         ret = temp5 ^ (temp5 >> self.l)
         return ret & 0xFFFFFFFF
 
-    def create_state_array(self, seeds: List[int] = []):
+    def create_state_array(self, seeds: List[int] = [], amount: int = 2_000_000):
         seeds = seeds[:8]
         if len(seeds) < 8:
             seeds = self._generate_random_seeds(8)
@@ -298,7 +298,7 @@ class MT19937:
             raise ValueError(f"v7 < 0x80000000")
 
         self.state_index = self.n
-        self.xor_array = self.create_xor_arrays(2_000_000)
+        self.xor_array = self.create_xor_arrays(amount)
 
     def get_state_idx(self, state_idx: int):
         if state_idx >= self.n * 2:
@@ -317,6 +317,82 @@ class MT19937:
             return store_at_index(self.state_array, state_idx, value)
 
         return store_at_index(self.temp_state_array, state_idx - self.n, value)
+
+    def derive_new_keys_from_string(self, encryption_string: bytes):
+        """
+        Short implementation of MK11.exe+B1AD50
+        """
+        v3 = b""
+        v4 = 0
+        v5 = len(encryption_string)
+        v6 = 0
+        if v5:
+            v7 = v5 - 1
+            if v5 - 1 > 0x28:
+                if v5 - 0x17 >= 0:
+                    v9 = -1
+                    if v5 - 0x17 < v7:
+                        v9 = -23
+                    v8 = v5 + v9
+                else:
+                    v8 = 0
+                v10 = v7 - v8
+                if v10 > 12:
+                    v10 = 12
+                v11 = 0  # index into encryption string
+                v4 = v10 + 1
+                if not v10:
+                    v4 = 0
+                v6 = v4
+                v3 = b""
+                if v4:
+                    v3 = encryption_string[
+                        v11 + v8 + 1 : v11 + v8 + v10 + 1
+                    ]  # Copy specific bytes from
+                v12 = v3
+                if not v4:
+                    v12 = b""  # Null
+            else:
+                v12 = b""
+        else:
+            v12 = b""
+
+        v16 = self._key_seed_from_str(v12, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
+
+        v17 = b""
+        if v6:
+            v17 = v3
+        v44 = self._key_seed_from_str(v17, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
+
+        v21 = b""
+        if v4:
+            v21 = v3
+        v25 = self._key_seed_from_str(v21, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
+
+        v26 = b""
+        if v4:
+            v26 = v3
+
+        v30 = self._key_seed_from_str(v26, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
+
+        v31 = v16 ^ v44
+        v32 = v25 ^ v44
+        v33 = v25 ^ v30
+        v45 = v31 ^ v30
+
+        key_1 = v31 ^ 0x77E56F3D
+        key_2 = v32 ^ 0x250A0D57
+        key_3 = v33 ^ 0xA4CA9627
+        key_4 = v45 ^ 0x9414718A
+
+        new_keys = [
+            key_1, key_2, key_3, key_4
+        ]
+
+        for i, n_k in enumerate(new_keys):
+            index = self.xor_key ^ self.xor_consts[i]
+            r_val = index_by(self.xor_array, index + 4, 1)
+            store_at_index(self.xor_array, index, r_val ^ n_k, 1)
 
     def get_keys(self):
         keys = []
@@ -350,6 +426,38 @@ class MT19937:
             self.set_at_state_idx(next_store, store_val_l ^ store_val_r)
             index_offset += 1
 
+    @classmethod
+    def _key_seed_from_str(cls, string, offset, mul_2, mul_1, mul_3, add_2, add_3, add_1):
+        v13 = string[8 + offset]
+        v14 = string[4 + offset]
+        v15 = string[offset]
+
+        v1 = mul_2 * v14
+        v1 &= 0xFFFFFFFF
+
+        v2 = mul_1 * v13
+        v2 &= 0xFFFFFFFF
+
+        v3 = mul_3 * v15
+        v3 &= 0xFFFFFFFF
+
+        v4 = v14 + add_2
+        v4 &= 0xFFFFFFFF
+
+        v5 = v15 + add_3
+        v5 &= 0xFFFFFFFF
+
+        v6 = v13 + add_1
+        v6 &= 0xFFFFFFFF
+
+        mul = v4 * v5
+        mul &= 0xFFFFFFFF
+        mul *= v6
+        mul &= 0xFFFFFFFF
+        val = v1 + v2 + v3 + mul
+
+        return val & 0xFFFFFFFF
+
     def unsigned_to_signed(self, value: int, mask_size: int = 4):
         mask = (1 << (mask_size * 8)) - 1  # Ensure value stays within 32-bit
         value &= mask
@@ -365,8 +473,10 @@ if __name__ == "__main__":
 
     seed = 0x1571
 
+    print("Initializing MT19937 with seed", seed)
     rng = MT19937()
     rng.initialize_state(seed)
+    print("Creating randoms")
     rng.create_state_array(
         [
             0x84AC2951,
@@ -379,6 +489,14 @@ if __name__ == "__main__":
             0x6A1858D5,
         ]
     )
-    
+
+    print("Results")
     print(rng.xor_consts)
+    print([hex(a) for a in rng.xor_consts])
     print(rng.get_keys())
+    print([hex(a) for a in rng.get_keys()])
+
+    print("Reseed!")
+    rng.derive_new_keys_from_string(string)
+    print(rng.get_keys())
+    print([hex(a) for a in rng.get_keys()])
