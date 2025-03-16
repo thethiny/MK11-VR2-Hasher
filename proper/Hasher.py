@@ -1,4 +1,5 @@
 import struct
+from typing import Any
 
 
 class VR2Hasher:
@@ -33,7 +34,7 @@ class VR2Hasher:
         return val
 
     @classmethod
-    def resign_seeds(cls, *seeds: int):
+    def _to_uint32(cls, *seeds: int):
         inputs = [a & 0xFFFFFFFF for a in seeds]
         return inputs
 
@@ -56,8 +57,8 @@ class VR2Hasher:
         # self.CONST_31FA274
         return self.CONST_31FA270
 
-    def B1CFA0(self, seed2_copy: int, seed2: int, seed3: int, seed1: int, seed4: int):
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+    def hash_round_B1CFA0(self, seed2_copy: int, seed2: int, seed3: int, seed1: int, seed4: int):
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         if seed2_copy <= 0:
             return seed1, seed2, seed3, seed4
@@ -80,25 +81,25 @@ class VR2Hasher:
         seed4 &= 0xFFFFFFFF
 
         if (seed2_copy % 678) > 31:
-            seed1, seed2, seed3, seed4 = self.B1D4C0(
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D4C0(
                 seed2_copy // self.ADE9B0 - 3, seed2, seed3, seed1, seed4
             )
 
         if (seed2_copy % 7) < 3:
             division_result = self.magic_division(seed2_copy, 0x6666666666666667, 1)
-            seed1, seed2, seed3, seed4 = self.B1D120(
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D120(
                 division_result - 6, seed2, seed3, seed1, seed4
             )
 
         if (seed2_copy % 11) > 4:
-            seed1, seed2, seed3, seed4 = self.B1D280(
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D280(
                 seed2_copy // 7 - 6, seed2, seed3, seed1, seed4
             )
 
         return seed1, seed2, seed3, seed4
 
-    def B1D4C0(self, seed2_copy, seed2, seed3, seed1, seed4):
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+    def hash_round_B1D4C0(self, seed2_copy, seed2, seed3, seed1, seed4):
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         if seed2_copy <= 0:
             return seed1, seed2, seed3, seed4
@@ -119,24 +120,24 @@ class VR2Hasher:
         seed4 &= 0xFFFFFFFF
         seed2 ^= seed4
 
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         if seed2_copy % 4 == 0:
             division_result = self.magic_division(seed2_copy, 0x4924924924924925, 1)
-            seed1, seed2, seed3, seed4 = self.B1CFA0(division_result - 3, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1CFA0(division_result - 3, seed2, seed3, seed1, seed4)
 
         if (seed2_copy % 5) < 3:
             div_result = seed2_copy // 4
-            seed1, seed2, seed3, seed4 = self.B1D120(div_result - 6, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D120(div_result - 6, seed2, seed3, seed1, seed4)
 
         if (seed2_copy % 8) > 4:
             div_result = self.magic_division(seed2_copy, 0x5555555555555556)
-            seed1, seed2, seed3, seed4 = self.B1D280(div_result - 6, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D280(div_result - 6, seed2, seed3, seed1, seed4)
 
         return seed1, seed2, seed3, seed4
 
-    def B1D120(self, seed2_copy, seed2, seed3, seed1, seed4):
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+    def hash_round_B1D120(self, seed2_copy, seed2, seed3, seed1, seed4):
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         if seed2_copy <= 0:
             return seed1, seed2, seed3, seed4
@@ -151,18 +152,18 @@ class VR2Hasher:
 
         if (seed2_copy & 1) == 0:
             div_result = self.magic_division(seed2_copy, 0x5555555555555556)
-            seed1, seed2, seed3, seed4 = self.B1D4C0(div_result - 3, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D4C0(div_result - 3, seed2, seed3, seed1, seed4)
         if (seed2_copy % 7) < 3:
             div_result = self.magic_division(seed2_copy, 0x6666666666666667, 1)
-            seed1, seed2, seed3, seed4 = self.B1CFA0(div_result - 6, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1CFA0(div_result - 6, seed2, seed3, seed1, seed4)
         if (seed2_copy % 11) > 4:
             div_result = seed2_copy // 7
-            seed1, seed2, seed3, seed4 = self.B1D280(div_result - 6, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D280(div_result - 6, seed2, seed3, seed1, seed4)
 
         return seed1, seed2, seed3, seed4
 
-    def B1D280(self, seed2_copy, seed2, seed3, seed1, seed4):  # REMADE
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+    def hash_round_B1D280(self, seed2_copy, seed2, seed3, seed1, seed4):  # REMADE
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         if seed2_copy <= 0:
             return seed1, seed2, seed3, seed4
@@ -177,17 +178,17 @@ class VR2Hasher:
         seed4 &= 0xFFFFFFFF
         seed2 ^= seed4
 
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         if (seed2_copy % 7) > 3:
             div_result = self.magic_division(seed2_copy, 0x4924924924924925, 2)
-            seed1, seed2, seed3, seed4 = self.B1D4C0(div_result - 3, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D4C0(div_result - 3, seed2, seed3, seed1, seed4)
         if (seed2_copy % 9) < 2:
             div_result = self.magic_division(seed2_copy, 0x5555555555555556)
-            seed1, seed2, seed3, seed4 = self.B1CFA0(div_result - 6, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1CFA0(div_result - 6, seed2, seed3, seed1, seed4)
         if (seed2_copy % 131) > 66:  # USED
             div_result = self.magic_division(seed2_copy, 0x6666666666666667, 1)
-            seed1, seed2, seed3, seed4 = self.B1D280(div_result - 7, seed2, seed3, seed1, seed4)
+            seed1, seed2, seed3, seed4 = self.hash_round_B1D280(div_result - 7, seed2, seed3, seed1, seed4)
 
         return seed1, seed2, seed3, seed4
 
@@ -210,7 +211,7 @@ class VR2Hasher:
         seed2 += v12
         seed2 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3, seed4 = self.B1CFA0(seed2, seed2, seed3, seed1, seed4)
+        seed1, seed2, seed3, seed4 = self.hash_round_B1CFA0(seed2, seed2, seed3, seed1, seed4)
 
         v15 = self.keys[2]
 
@@ -226,7 +227,7 @@ class VR2Hasher:
         seed1 += seed3
         seed1 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
         return seed1, seed2, seed3, seed4, v120
 
@@ -242,7 +243,7 @@ class VR2Hasher:
         seed1 &= 0xFFFFFFFF
         seed4 = seed3
 
-        seed3, seed1, seed2, seed4 = self.B1D4C0(seed1, seed1, seed2, seed3, seed4)
+        seed3, seed1, seed2, seed4 = self.hash_round_B1D4C0(seed1, seed1, seed2, seed3, seed4)
 
         seed2 -= seed1
         seed2 &= 0xFFFFFFFF
@@ -253,7 +254,7 @@ class VR2Hasher:
         seed1 += seed3
         seed1 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
         return seed1, seed2, seed3, seed4, v120, v48
 
     def hash_step_60(self, seed3: int, seed2: int, seed1: int, seed4: int, v120: int):
@@ -279,9 +280,9 @@ class VR2Hasher:
         seed3 += seed2
         seed3 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
 
-        seed1, seed3, seed2, seed4 = self.B1D120(seed3, seed3, seed2, seed1, seed4)
+        seed1, seed3, seed2, seed4 = self.hash_round_B1D120(seed3, seed3, seed2, seed1, seed4)
 
         v28 = self.keys[3]
         seed3 ^= v28
@@ -298,7 +299,7 @@ class VR2Hasher:
         seed2 += seed1
         seed2 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3, seed4 = self.resign_seeds(seed1, seed2, seed3, seed4)
+        seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
         return seed1, seed2, seed3, seed4, v120
 
     def hash_step_20(self, seed3: int, seed2: int, seed1: int, v120: int):
@@ -313,7 +314,7 @@ class VR2Hasher:
         v13 = self.ROL4(seed1, 11)
         seed2 ^= v13
 
-        seed1, seed2, seed3 = self.resign_seeds(seed1, seed2, seed3)
+        seed1, seed2, seed3 = self._to_uint32(seed1, seed2, seed3)
         return seed1, seed2, seed3, v120
 
     def hash_step_40(self, seed2: int, seed3: int, seed1: int, v120: int):
@@ -326,7 +327,7 @@ class VR2Hasher:
         seed1 += seed2
         seed1 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3 = self.resign_seeds(seed1, seed2, seed3)
+        seed1, seed2, seed3 = self._to_uint32(seed1, seed2, seed3)
 
         return seed1, seed2, seed3, v120
 
@@ -337,7 +338,7 @@ class VR2Hasher:
         seed3 += seed2
         seed3 &= 0xFFFFFFFF
 
-        seed1, seed2, seed3, v48 = self.resign_seeds(seed1, seed2, seed3, v48)
+        seed1, seed2, seed3, v48 = self._to_uint32(seed1, seed2, seed3, v48)
 
         return seed1, seed2, seed3, v48, v120
 
@@ -420,7 +421,10 @@ class VR2Hasher:
     def hash(self, string: str):           
         padded = self.pad_string(string).encode("ascii")
         hashed = self.vr2_hash(padded, self.seed)
-        return hex(hashed)
+        return hex(hashed & 0xFFFFFFFF)
+    
+    def __call__(self, string: str):
+        return self.hash(string)
 
 if __name__ == "__main__":
     keys = [0x7df1d6dc, 0xbd3e1588, 0x86e2354d, 0xeaa35755]
