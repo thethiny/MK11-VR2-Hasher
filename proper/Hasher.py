@@ -1,5 +1,8 @@
 import struct
-from typing import Any
+from typing import Any, List, Optional, Tuple, Union, overload
+
+from proper.MersenneTwister import MT19937
+from utils import index_by, store_at_index
 
 
 class VR2Hasher:
@@ -8,11 +11,99 @@ class VR2Hasher:
     CONST_31FA270 = 3
     DEFAULT_SEED = 0x291
 
-    def __init__(self, key_1: int, key_2: int, key_3: int, key_4: int, seed: int = DEFAULT_SEED):
-        self.keys = [
-            key_1, key_2, key_3, key_4
-        ]
-        self.seed = seed
+    def __init__(
+        self,
+        hash_seed: int = DEFAULT_SEED,
+        calculate_randoms: bool = False,
+        mt_seed: Optional[int] = None,
+        mt_seed_array: List[int] = [],
+        encryption_string: Union[str, bytes] = "",
+        xor_array_size: int = 2_000_000,
+        vr2_keys: List[int] = [],
+    ):
+        self._seed = hash_seed
+        self._mt_seed = 0
+        self.__mt_init = False
+        self.__init = False
+
+        self._keys = []
+        self._xor_key = 0
+        self._xor_consts = [0]*4
+        self._xor_array = bytearray()
+        
+        if vr2_keys:
+            if len(vr2_keys) != 4:
+                raise ValueError(f"In order to override the VR2 Keys you need to pass 4 keys.")
+            
+            self._keys = vr2_keys
+            self.__init = True
+            return
+
+        if encryption_string and isinstance(encryption_string, str):
+            encryption_string = encryption_string.encode("ascii")
+
+        if calculate_randoms:
+            self.__mt_init = True
+            self._mt_seed = mt_seed or MT19937.DEFAULT_SEED
+            self._mt = MT19937()
+            self._mt.initialize_state(self._mt_seed)
+            self._mt.create_state_array(mt_seed_array)
+            self.__mt_init = True
+
+            self._xor_array = self.create_xor_arrays(array_size=xor_array_size, element_size=4)
+
+            if encryption_string:
+                new_keys = self.derive_new_keys_from_string(encryption_string)
+                self.set_keys(new_keys)
+
+            self._keys = self.get_keys()
+
+        elif encryption_string:
+            if isinstance(encryption_string, str):
+                encryption_string = encryption_string.encode("ascii")
+            self._keys = self.derive_new_keys_from_string(encryption_string)
+        else:
+            raise ValueError(f"Either `calculate_randoms` must be set, or `encryption_string` must be provided!")
+
+        self.__init = True
+
+    @property
+    def keys(self):
+        if not self.__init:
+            raise ValueError(f"VR2 Hasher is not yet initialized!")
+        return self._keys
+
+    @property
+    def xor_key(self):
+        if not self.__mt_init:
+            if self.__init:
+                raise ValueError("Cannot use 'xor_key' in shortcut mode as it is not calculated!")
+            raise ValueError("VR2 Hasher is not yet initialized!")
+        return self._xor_key
+
+    @property
+    def xor_consts(self):
+        if not self.__mt_init:
+            if self.__init:
+                raise ValueError("Cannot use 'xor_consts' in shortcut mode as they are not calculated!")
+            raise ValueError("VR2 Hasher is not yet initialized!")
+        return self._xor_consts
+
+    @property
+    def xor_array(self):
+        if not self.__mt_init:
+            if self.__init:
+                raise ValueError("Cannot use 'xor_array' in shortcut mode as it is not calculated!")
+            raise ValueError("VR2 Hasher is not yet initialized!")
+        return self._xor_array
+
+    @property
+    def mt(self):
+        if not self.__mt_init:
+            if self.__init:
+                raise ValueError("Cannot use 'mt' in shortcut mode as it is not initialized!")
+            raise ValueError("VR2 Hasher is not yet initialized!")
+        return self._mt
 
     @classmethod
     def ROL4(cls, value, shift):
@@ -56,6 +147,157 @@ class VR2Hasher:
     def ADE9B0(self):
         # self.CONST_31FA274
         return self.CONST_31FA270
+
+    @classmethod
+    def _key_seed_from_str(
+        cls, string, offset, mul_2, mul_1, mul_3, add_2, add_3, add_1
+    ):
+        v13 = string[8 + offset]
+        v14 = string[4 + offset]
+        v15 = string[offset]
+
+        v1 = mul_2 * v14
+        v1 &= 0xFFFFFFFF
+
+        v2 = mul_1 * v13
+        v2 &= 0xFFFFFFFF
+
+        v3 = mul_3 * v15
+        v3 &= 0xFFFFFFFF
+
+        v4 = v14 + add_2
+        v4 &= 0xFFFFFFFF
+
+        v5 = v15 + add_3
+        v5 &= 0xFFFFFFFF
+
+        v6 = v13 + add_1
+        v6 &= 0xFFFFFFFF
+
+        mul = v4 * v5
+        mul &= 0xFFFFFFFF
+        mul *= v6
+        mul &= 0xFFFFFFFF
+        val = v1 + v2 + v3 + mul
+
+        return val & 0xFFFFFFFF
+
+    def unsigned_to_signed(self, value: int, mask_size: int = 4):
+        mask = (1 << (mask_size * 8)) - 1  # Ensure value stays within 32-bit
+        value &= mask
+        limit = 1 << (mask_size * 8 - 1)  # 0x80000000 (sign bit)
+
+        if value >= limit:  # If the value is in the negative range
+            return value - (1 << (mask_size * 8))  # Convert to signed
+
+        return value  # Return as is if positive
+
+    def create_xor_arrays(self, array_size: int, element_size: int = 4):
+        if array_size % 16 or array_size < 100_000 or element_size > 20:
+            raise ValueError(f"Incorrect XOR Array Config!")
+
+        array_elements_count = array_size >> 2
+        xor_array = bytearray(array_size)
+        for v10 in range(array_elements_count):
+            store_at_index(xor_array, v10, self._mt.random())
+
+        self._xor_key = 0
+
+        v12 = 0
+        if self.unsigned_to_signed(element_size) >= 0:
+            v14 = (array_size // element_size - 20) >> 1
+            v15 = array_size - 20
+            for v13 in range(element_size):
+                v27 = self._mt.random()
+                v12 += v14 + v27 % v14 + 0x14
+
+                if v12 > v15:
+                    return
+
+                self._xor_consts[v13] = v12
+
+        v29 = 4 * element_size
+        v29 &= 0xFFFFFFFF
+        if self.unsigned_to_signed(v29) <= 0:
+            return
+
+        for _ in range(v29):
+            v43 = self._mt.random() % element_size
+            v55 = self._mt.random() % element_size
+            if v43 != v55:
+                v56 = self._xor_consts[v55]
+                v57 = self._xor_consts[v43]
+
+                self._xor_consts[v55] = v57
+                self._xor_consts[v43] = v56
+
+        v59 = self._mt.random()
+        self._xor_key = v59
+        s_size = self.unsigned_to_signed(element_size)
+        if s_size > 0 and element_size >= 0x10:
+            raise NotImplementedError(f"Element Size >= 10 is not supported")
+
+        for i in range(element_size):
+            self._xor_consts[i] ^= self._xor_key
+
+        return xor_array
+
+    def derive_new_keys_from_string(self, encryption_string: bytes) -> List[int]:
+        """
+        Short implementation of MK11.exe+B1AD50
+        encryption_string should be X-Hydra-Access-Token
+        """
+        if len(encryption_string) < 0x30:
+            raise ValueError(f"Key must be at least 48 bytes")
+
+        extracted_bytes = encryption_string[-22:-10]
+
+        # Generate keys from extracted_bytes using _key_seed_from_str
+        key_seed_1 = self._key_seed_from_str(extracted_bytes, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
+        key_seed_2 = self._key_seed_from_str(extracted_bytes, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
+        key_seed_3 = self._key_seed_from_str(extracted_bytes, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
+        key_seed_4 = self._key_seed_from_str(extracted_bytes, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
+
+        # Compute intermediate XOR operations
+        xor_1 = key_seed_1 ^ key_seed_2
+        xor_2 = key_seed_3 ^ key_seed_2
+        xor_3 = key_seed_3 ^ key_seed_4
+        xor_4 = xor_1 ^ key_seed_4
+
+        # Compute final keys
+        new_keys = [
+            xor_1 ^ 0x77E56F3D,
+            xor_2 ^ 0x250A0D57,
+            xor_3 ^ 0xA4CA9627,
+            xor_4 ^ 0x9414718A
+        ]
+
+        return new_keys
+
+    def get_keys(self):
+        if not self.__mt_init:
+            return self.keys
+
+        keys = []
+        for key in self._xor_consts:
+            index = key ^ self._xor_key
+            left = index_by(self._xor_array, index, 1)
+            right = index_by(self._xor_array, index + 4, 1)
+            keys.append(left ^ right)
+        return keys
+
+    def set_keys(self, new_keys: List[int]):
+        if len(new_keys) != 4:
+            raise ValueError(f"Expecting 4 keys!")
+
+        if not self.__mt_init:
+            self._keys = new_keys
+            return
+
+        for i, key in enumerate(new_keys):
+            index = self._xor_key ^ self._xor_consts[i]
+            stored_value = index_by(self._xor_array, index + 4, 1)
+            store_at_index(self._xor_array, index, stored_value ^ key, 1)
 
     def hash_round_B1CFA0(self, seed2_copy: int, seed2: int, seed3: int, seed1: int, seed4: int):
         seed1, seed2, seed3, seed4 = self._to_uint32(seed1, seed2, seed3, seed4)
@@ -213,7 +455,7 @@ class VR2Hasher:
 
         seed1, seed2, seed3, seed4 = self.hash_round_B1CFA0(seed2, seed2, seed3, seed1, seed4)
 
-        v15 = self.keys[2]
+        v15 = self._keys[2]
 
         seed2 ^= v15
 
@@ -236,7 +478,7 @@ class VR2Hasher:
         if seed1 > seed3:
             seed1, seed2, seed3, v48, v120 = self.hash_step_80_internal(seed1, seed3, v48, seed2, v120)
 
-        v3 = self.keys[0]
+        v3 = self._keys[0]
 
         seed1 ^= v3
         seed1 += 1
@@ -260,7 +502,7 @@ class VR2Hasher:
     def hash_step_60(self, seed3: int, seed2: int, seed1: int, seed4: int, v120: int):
         seed3 -= seed2
         seed3 &= 0xFFFFFFFF
-        
+
         v5 = self.ROL_XOR4(seed2, 5) 
         seed1 ^= v5
 
@@ -284,7 +526,7 @@ class VR2Hasher:
 
         seed1, seed3, seed2, seed4 = self.hash_round_B1D120(seed3, seed3, seed2, seed1, seed4)
 
-        v28 = self.keys[3]
+        v28 = self._keys[3]
         seed3 ^= v28
         seed3 -= seed2
         seed3 &= 0xFFFFFFFF
@@ -318,7 +560,7 @@ class VR2Hasher:
         return seed1, seed2, seed3, v120
 
     def hash_step_40(self, seed2: int, seed3: int, seed1: int, v120: int):
-        v4 = self.keys[1]
+        v4 = self._keys[1]
         seed2 ^= v4
         seed2 -= seed3
         seed2 &= 0xFFFFFFFF
@@ -366,7 +608,7 @@ class VR2Hasher:
 
         return next_thread_id, seed1, seed2, seed3, seed4
 
-    def vr2_hash(self, string: bytes, seed: int):
+    def _vr2_hash(self, string: bytes, seed: int):
         string_length = len(string)
 
         seed3_v74 = seed_4v44 = total_read_string_bytes = 0
@@ -418,16 +660,11 @@ class VR2Hasher:
 
         return seed3_v74
 
-    def hash(self, string: str):           
+    def hash(self, string: str):
         padded = self.pad_string(string).encode("ascii")
-        hashed = self.vr2_hash(padded, self.seed)
-        return hex(hashed & 0xFFFFFFFF)
-    
+        hashed = self._vr2_hash(padded, self._seed)
+        hashed &= 0xFFFFFFFF
+        return hashed
+
     def __call__(self, string: str):
         return self.hash(string)
-
-if __name__ == "__main__":
-    keys = [0x7df1d6dc, 0xbd3e1588, 0x86e2354d, 0xeaa35755]
-    hasher = VR2Hasher(*keys)
-    hash = hasher.hash("test23")
-    print(hash)

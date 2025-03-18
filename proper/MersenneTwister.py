@@ -4,6 +4,8 @@ from typing import List
 
 import numpy as np
 
+from utils import index_by, resign_seeds, store_at_index
+
 
 def dump(*arrays, name: str):
     if not name.lower().endswith(".bin"):
@@ -13,27 +15,6 @@ def dump(*arrays, name: str):
         array += a
     with open(name, "wb") as f:
         f.write(array)
-
-
-def str_to_bytes(bytearray, offset):
-    val = struct.unpack_from("<I", bytearray, offset)[0]
-    return val
-
-def index_by(bytearray, index, size: int = 4):
-    val = str_to_bytes(bytearray, index * size)
-    return val
-
-def store_at_index(bytearray, index, value, size: int = 4):
-    struct.pack_into("<I", bytearray, index * size, value)
-
-def get_bitmask_ff(size: int):
-    # Create a bitmask based on size (e.g., 0xFF for 1 byte, 0xFFFF for 2 bytes, etc.)
-    return (1 << (size * 8)) - 1
-
-def resign_seeds(*seeds: int, size: int = 4):
-    mask = get_bitmask_ff(size)
-    inputs = [a & mask for a in seeds]
-    return inputs
 
 
 class MT19937:
@@ -54,9 +35,6 @@ class MT19937:
     def __init__(self):
         self.init = False
         self.state_index = 0
-        self.xor_key = 0
-        self.xor_consts = [0]*4
-        self.xor_array = bytearray()
 
     def initialize_state(self, seed: int = DEFAULT_SEED):
         result_arr = bytearray()
@@ -149,36 +127,36 @@ class MT19937:
 
         return state_array
 
-    def store_xor_const(self, result_index, initial_value, next_index, next_index_2):
-        # Fancy function that just stores XOR values in order
-        v7 = next_index  # index to compare against
-        v8 = v7 + 1  # index 1
-        v9 = next_index_2
-        v10 = v9 >> 1
-        if v9 <= 0x3FFFFFFFFFFFFFFF - v10:
-            v11 = v10 + v9
-            if v11 < v8:
-                v11 = v8
-        else:
-            v11 = v8
+    # def store_xor_const(self, result_index, initial_value, next_index, next_index_2):
+    #     # Fancy function that just stores XOR values in order
+    #     v7 = next_index  # index to compare against
+    #     v8 = v7 + 1  # index 1
+    #     v9 = next_index_2
+    #     v10 = v9 >> 1
+    #     if v9 <= 0x3FFFFFFFFFFFFFFF - v10:
+    #         v11 = v10 + v9
+    #         if v11 < v8:
+    #             v11 = v8
+    #     else:
+    #         v11 = v8
 
-        v12 = v13 = v11 * 4
-        if v11 > 0x3FFFFFFFFFFFFFFF:
-            raise ValueError(f"v11 is too big!")
-        if v13 == 0:
-            raise ValueError(
-                f"v13 was 0. Something went wrong! (Will cause infinite recursion)"
-            )
-        if v13 < 0x1000:
-            pass  # Do nothing since it should go fine # The pass is there so I can track it in ida if I need
-            # v16 = [[]] * v11 # Array of size 4 # Not needed since I can directly modify my memory
-        else:
-            raise NotImplementedError(
-                f"This area is not tested! Erroring so you can trace!"
-            )
+    #     v12 = v13 = v11 * 4
+    #     if v11 > 0x3FFFFFFFFFFFFFFF:
+    #         raise ValueError(f"v11 is too big!")
+    #     if v13 == 0:
+    #         raise ValueError(
+    #             f"v13 was 0. Something went wrong! (Will cause infinite recursion)"
+    #         )
+    #     if v13 < 0x1000:
+    #         pass  # Do nothing since it should go fine # The pass is there so I can track it in ida if I need
+    #         # v16 = [[]] * v11 # Array of size 4 # Not needed since I can directly modify my memory
+    #     else:
+    #         raise NotImplementedError(
+    #             f"This area is not tested! Erroring so you can trace!"
+    #         )
 
-        self.xor_consts[result_index] = initial_value
-        return v8, v12 // 4
+    #     self.xor_consts[result_index] = initial_value
+    #     return v8, v12 // 4
 
     def _generate_random_seeds(self, n: int = 8):
         if n < 1:
@@ -198,56 +176,6 @@ class MT19937:
             seeds.append(rand_int)
 
         return seeds
-
-    def create_xor_arrays(self, array_size: int, element_size: int = 4):
-        if array_size % 16 or array_size < 100_000 or element_size > 20:
-            raise ValueError(f"Incorrect XOR Array Config!")
-
-        array_elements_count = array_size >> 2
-        xor_array = bytearray(array_size)
-        for v10 in range(array_elements_count):
-            store_at_index(xor_array, v10, self.random())
-
-        self.xor_key = 0
-
-        v12 = 0
-        if self.unsigned_to_signed(element_size) >= 0:
-            v14 = (array_size // element_size - 20) >> 1
-            v15 = array_size - 20
-            for v13 in range(element_size):
-                v27 = self.random()
-                v12 += v14 + v27 % v14 + 0x14
-
-                if v12 > v15:
-                    return
-
-                self.xor_consts[v13] = v12
-
-        v29 = 4 * element_size
-        v29 &= 0xFFFFFFFF
-        if self.unsigned_to_signed(v29) <= 0:
-            return
-
-        for _ in range(v29):
-            v43 = self.random() % element_size
-            v55 = self.random() % element_size
-            if v43 != v55:
-                v56 = self.xor_consts[v55]
-                v57 = self.xor_consts[v43]
-
-                self.xor_consts[v55] = v57
-                self.xor_consts[v43] = v56
-
-        v59 = self.random()
-        self.xor_key = v59
-        s_size = self.unsigned_to_signed(element_size)
-        if s_size > 0 and element_size >= 0x10:
-            raise NotImplementedError(f"Element Size >= 10 is not supported")
-
-        for i in range(element_size):
-            self.xor_consts[i] ^= self.xor_key
-
-        return xor_array
 
     def random(self):
         if self.state_index == self.n:
@@ -273,7 +201,7 @@ class MT19937:
         ret = temp5 ^ (temp5 >> self.l)
         return ret & 0xFFFFFFFF
 
-    def create_state_array(self, seeds: List[int] = [], amount: int = 2_000_000):
+    def create_state_array(self, seeds: List[int] = []):
         seeds = seeds[:8]
         if len(seeds) < 8:
             seeds = self._generate_random_seeds(8)
@@ -289,7 +217,6 @@ class MT19937:
             raise ValueError(f"v7 < 0x80000000")
 
         self.state_index = self.n
-        self.xor_array = self.create_xor_arrays(amount)
 
     def get_state_idx(self, state_idx: int):
         if state_idx >= self.n * 2:
@@ -308,138 +235,6 @@ class MT19937:
             return store_at_index(self.state_array, state_idx, value)
 
         return store_at_index(self.temp_state_array, state_idx - self.n, value)
-
-    # def derive_new_keys_from_string_old(self, encryption_string: bytes):
-    #     """
-    #     Short implementation of MK11.exe+B1AD50
-    #     """
-    #     v3 = b""
-    #     v4 = 0
-    #     string_length = len(encryption_string)
-    #     v6 = 0
-    #     if string_length:
-    #         v7 = string_length - 1
-    #         if string_length - 1 > 0x28:
-    #             if string_length - 0x17 >= 0:
-    #                 v9 = -1
-    #                 if string_length - 0x17 < v7:
-    #                     v9 = -23
-    #                 v8 = string_length + v9
-    #             else:
-    #                 v8 = 0
-    #             v10 = v7 - v8
-    #             if v10 > 12:
-    #                 v10 = 12
-    #             v11 = 0  # index into encryption string
-    #             v4 = v10 + 1
-    #             if not v10:
-    #                 v4 = 0
-    #             v6 = v4
-    #             v3 = b""
-    #             if v4:
-    #                 v3 = encryption_string[
-    #                     v11 + v8 + 1 : v11 + v8 + v10 + 1
-    #                 ]  # Copy specific bytes from
-    #             v12 = v3
-    #             if not v4:
-    #                 v12 = b""  # Null
-    #         else:
-    #             v12 = b""
-    #     else:
-    #         v12 = b""
-
-    #     v16 = self._key_seed_from_str(v12, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
-
-    #     v17 = b""
-    #     if v6:
-    #         v17 = v3
-    #     v44 = self._key_seed_from_str(v17, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
-
-    #     v21 = b""
-    #     if v4:
-    #         v21 = v3
-    #     v25 = self._key_seed_from_str(v21, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
-
-    #     v26 = b""
-    #     if v4:
-    #         v26 = v3
-
-    #     v30 = self._key_seed_from_str(v26, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
-
-    #     v31 = v16 ^ v44
-    #     v32 = v25 ^ v44
-    #     v33 = v25 ^ v30
-    #     v45 = v31 ^ v30
-
-    #     key_1 = v31 ^ 0x77E56F3D
-    #     key_2 = v32 ^ 0x250A0D57
-    #     key_3 = v33 ^ 0xA4CA9627
-    #     key_4 = v45 ^ 0x9414718A
-
-    #     new_keys = [
-    #         key_1, key_2, key_3, key_4
-    #     ]
-
-    #     for i, n_k in enumerate(new_keys):
-    #         index = self.xor_key ^ self.xor_consts[i]
-    #         r_val = index_by(self.xor_array, index + 4, 1)
-    #         store_at_index(self.xor_array, index, r_val ^ n_k, 1)
-
-    def derive_new_keys_from_string(self, encryption_string: bytes):
-        """
-        Short implementation of MK11.exe+B1AD50
-        encryption_string should be X-Hydra-Access-Token
-        """
-        if len(encryption_string) < 0x30:
-            raise ValueError(f"Key must be at least 48 bytes")
-
-        extracted_bytes = encryption_string[-22:-10]
-        
-        # length = len(encryption_string)
-
-        # # Extract a sub-sequence from encryption_string based on length constraints
-        # if length and length - 1 > 0x28:
-        #     offset = -23 if length - 0x17 < (length - 1) else -1
-        #     start_idx = max(length + offset, 0)
-        #     copy_length = min((length - 1) - start_idx, 12)
-        #     extracted_bytes = encryption_string[start_idx + 1 : start_idx + 1 + copy_length] if copy_length else b""
-        # else:
-        #     extracted_bytes = b""
-
-        # Generate keys from extracted_bytes using _key_seed_from_str
-        key_seed_1 = self._key_seed_from_str(extracted_bytes, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
-        key_seed_2 = self._key_seed_from_str(extracted_bytes, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
-        key_seed_3 = self._key_seed_from_str(extracted_bytes, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
-        key_seed_4 = self._key_seed_from_str(extracted_bytes, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
-
-        # Compute intermediate XOR operations
-        xor_1 = key_seed_1 ^ key_seed_2
-        xor_2 = key_seed_3 ^ key_seed_2
-        xor_3 = key_seed_3 ^ key_seed_4
-        xor_4 = xor_1 ^ key_seed_4
-
-        # Compute final keys
-        new_keys = [
-            xor_1 ^ 0x77E56F3D,
-            xor_2 ^ 0x250A0D57,
-            xor_3 ^ 0xA4CA9627,
-            xor_4 ^ 0x9414718A
-        ]
-
-        # Store computed keys using XOR-indexing
-        for i, key in enumerate(new_keys):
-            index = self.xor_key ^ self.xor_consts[i]
-            stored_value = index_by(self.xor_array, index + 4, 1)
-            store_at_index(self.xor_array, index, stored_value ^ key, 1)
-
-    def get_keys(self):
-        keys = []
-        for key in self.xor_consts:
-            index = key ^ self.xor_key
-            left  = index_by(self.xor_array, index, 1)
-            right = index_by(self.xor_array, index+4, 1)
-            keys.append(left ^ right)
-        return keys
 
     def complex_xor(self, range_: int, index_offset: int, xor_offset: int, store_offset: int, allow_overflow: bool = False):
         for _ in range(range_):
@@ -464,48 +259,6 @@ class MT19937:
             self.set_at_state_idx(next_store, store_val_l ^ store_val_r)
             index_offset += 1
 
-    @classmethod
-    def _key_seed_from_str(cls, string, offset, mul_2, mul_1, mul_3, add_2, add_3, add_1):
-        v13 = string[8 + offset]
-        v14 = string[4 + offset]
-        v15 = string[offset]
-
-        v1 = mul_2 * v14
-        v1 &= 0xFFFFFFFF
-
-        v2 = mul_1 * v13
-        v2 &= 0xFFFFFFFF
-
-        v3 = mul_3 * v15
-        v3 &= 0xFFFFFFFF
-
-        v4 = v14 + add_2
-        v4 &= 0xFFFFFFFF
-
-        v5 = v15 + add_3
-        v5 &= 0xFFFFFFFF
-
-        v6 = v13 + add_1
-        v6 &= 0xFFFFFFFF
-
-        mul = v4 * v5
-        mul &= 0xFFFFFFFF
-        mul *= v6
-        mul &= 0xFFFFFFFF
-        val = v1 + v2 + v3 + mul
-
-        return val & 0xFFFFFFFF
-
-    def unsigned_to_signed(self, value: int, mask_size: int = 4):
-        mask = (1 << (mask_size * 8)) - 1  # Ensure value stays within 32-bit
-        value &= mask
-        limit = 1 << (mask_size * 8 - 1)  # 0x80000000 (sign bit)
-
-        if value >= limit:  # If the value is in the negative range
-            return value - (1 << (mask_size * 8))  # Convert to signed
-
-        return value  # Return as is if positive
-
 
 if __name__ == "__main__":
 
@@ -528,13 +281,13 @@ if __name__ == "__main__":
         ]
     )
 
-    print("Results")
-    print(rng.xor_consts)
-    print([hex(a) for a in rng.xor_consts])
-    print(rng.get_keys())
-    print([hex(a) for a in rng.get_keys()])
+    # print("Results")
+    # print(rng.xor_consts)
+    # print([hex(a) for a in rng.xor_consts])
+    # print(rng.get_keys())
+    # print([hex(a) for a in rng.get_keys()])
 
-    print("Reseed!")
-    rng.derive_new_keys_from_string(string)
-    print(rng.get_keys())
-    print([hex(a) for a in rng.get_keys()])
+    # print("Reseed!")
+    # rng.derive_new_keys_from_string(string)
+    # print(rng.get_keys())
+    # print([hex(a) for a in rng.get_keys()])

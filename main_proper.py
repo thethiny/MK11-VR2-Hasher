@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     print([hex(a) for a in keys])
 
-    hasher = VR2Hasher(*keys, seed=0x291)
+    hasher = VR2Hasher(*keys, hash_seed=0x291)
 
     strings = [
         "",
