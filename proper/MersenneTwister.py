@@ -309,96 +309,102 @@ class MT19937:
 
         return store_at_index(self.temp_state_array, state_idx - self.n, value)
 
-    def derive_new_keys_from_string_old(self, encryption_string: bytes):
-        """
-        Short implementation of MK11.exe+B1AD50
-        """
-        v3 = b""
-        v4 = 0
-        string_length = len(encryption_string)
-        v6 = 0
-        if string_length:
-            v7 = string_length - 1
-            if string_length - 1 > 0x28:
-                if string_length - 0x17 >= 0:
-                    v9 = -1
-                    if string_length - 0x17 < v7:
-                        v9 = -23
-                    v8 = string_length + v9
-                else:
-                    v8 = 0
-                v10 = v7 - v8
-                if v10 > 12:
-                    v10 = 12
-                v11 = 0  # index into encryption string
-                v4 = v10 + 1
-                if not v10:
-                    v4 = 0
-                v6 = v4
-                v3 = b""
-                if v4:
-                    v3 = encryption_string[
-                        v11 + v8 + 1 : v11 + v8 + v10 + 1
-                    ]  # Copy specific bytes from
-                v12 = v3
-                if not v4:
-                    v12 = b""  # Null
-            else:
-                v12 = b""
-        else:
-            v12 = b""
+    # def derive_new_keys_from_string_old(self, encryption_string: bytes):
+    #     """
+    #     Short implementation of MK11.exe+B1AD50
+    #     """
+    #     v3 = b""
+    #     v4 = 0
+    #     string_length = len(encryption_string)
+    #     v6 = 0
+    #     if string_length:
+    #         v7 = string_length - 1
+    #         if string_length - 1 > 0x28:
+    #             if string_length - 0x17 >= 0:
+    #                 v9 = -1
+    #                 if string_length - 0x17 < v7:
+    #                     v9 = -23
+    #                 v8 = string_length + v9
+    #             else:
+    #                 v8 = 0
+    #             v10 = v7 - v8
+    #             if v10 > 12:
+    #                 v10 = 12
+    #             v11 = 0  # index into encryption string
+    #             v4 = v10 + 1
+    #             if not v10:
+    #                 v4 = 0
+    #             v6 = v4
+    #             v3 = b""
+    #             if v4:
+    #                 v3 = encryption_string[
+    #                     v11 + v8 + 1 : v11 + v8 + v10 + 1
+    #                 ]  # Copy specific bytes from
+    #             v12 = v3
+    #             if not v4:
+    #                 v12 = b""  # Null
+    #         else:
+    #             v12 = b""
+    #     else:
+    #         v12 = b""
 
-        v16 = self._key_seed_from_str(v12, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
+    #     v16 = self._key_seed_from_str(v12, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
 
-        v17 = b""
-        if v6:
-            v17 = v3
-        v44 = self._key_seed_from_str(v17, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
+    #     v17 = b""
+    #     if v6:
+    #         v17 = v3
+    #     v44 = self._key_seed_from_str(v17, 1, 0x3B9FA118, 3756927701, -0x7720C8E, 0x3B9FA1, 0x11, 0xDFEE)
 
-        v21 = b""
-        if v4:
-            v21 = v3
-        v25 = self._key_seed_from_str(v21, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
+    #     v21 = b""
+    #     if v4:
+    #         v21 = v3
+    #     v25 = self._key_seed_from_str(v21, 2, -538039595, 0xE7026B48, 0x9C1BF55D, 0xDFEE2A, 17, 0xE702)
 
-        v26 = b""
-        if v4:
-            v26 = v3
+    #     v26 = b""
+    #     if v4:
+    #         v26 = v3
 
-        v30 = self._key_seed_from_str(v26, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
+    #     v30 = self._key_seed_from_str(v26, 3, -0x18FD94B8, 0xDFEE2AD5, 0x29C08DAF, 0xE7026B, 0x11, 0xDFEE)
 
-        v31 = v16 ^ v44
-        v32 = v25 ^ v44
-        v33 = v25 ^ v30
-        v45 = v31 ^ v30
+    #     v31 = v16 ^ v44
+    #     v32 = v25 ^ v44
+    #     v33 = v25 ^ v30
+    #     v45 = v31 ^ v30
 
-        key_1 = v31 ^ 0x77E56F3D
-        key_2 = v32 ^ 0x250A0D57
-        key_3 = v33 ^ 0xA4CA9627
-        key_4 = v45 ^ 0x9414718A
+    #     key_1 = v31 ^ 0x77E56F3D
+    #     key_2 = v32 ^ 0x250A0D57
+    #     key_3 = v33 ^ 0xA4CA9627
+    #     key_4 = v45 ^ 0x9414718A
 
-        new_keys = [
-            key_1, key_2, key_3, key_4
-        ]
+    #     new_keys = [
+    #         key_1, key_2, key_3, key_4
+    #     ]
 
-        for i, n_k in enumerate(new_keys):
-            index = self.xor_key ^ self.xor_consts[i]
-            r_val = index_by(self.xor_array, index + 4, 1)
-            store_at_index(self.xor_array, index, r_val ^ n_k, 1)
-            
+    #     for i, n_k in enumerate(new_keys):
+    #         index = self.xor_key ^ self.xor_consts[i]
+    #         r_val = index_by(self.xor_array, index + 4, 1)
+    #         store_at_index(self.xor_array, index, r_val ^ n_k, 1)
+
     def derive_new_keys_from_string(self, encryption_string: bytes):
         """
         Short implementation of MK11.exe+B1AD50
+        encryption_string should be X-Hydra-Access-Token
         """
-        length = len(encryption_string)
+        if len(encryption_string) < 0x30:
+            raise ValueError(f"Key must be at least 48 bytes")
 
-        # Extract a sub-sequence from encryption_string based on length constraints
-        if length and length - 1 > 0x28:
-            offset = -23 if length - 0x17 < (length - 1) else -1
-            start_idx = max(length + offset, 0)
-            copy_length = min((length - 1) - start_idx, 12)
-            extracted_bytes = encryption_string[start_idx + 1 : start_idx + 1 + copy_length] if copy_length else b""
-        else:
-            extracted_bytes = b""
+        extracted_bytes = encryption_string[-22:-10]
+        
+        # length = len(encryption_string)
+
+        # # Extract a sub-sequence from encryption_string based on length constraints
+        # if length and length - 1 > 0x28:
+        #     offset = -23 if length - 0x17 < (length - 1) else -1
+        #     start_idx = max(length + offset, 0)
+        #     copy_length = min((length - 1) - start_idx, 12)
+        #     extracted_bytes = encryption_string[start_idx + 1 : start_idx + 1 + copy_length] if copy_length else b""
+        # else:
+        #     extracted_bytes = b""
 
         # Generate keys from extracted_bytes using _key_seed_from_str
         key_seed_1 = self._key_seed_from_str(extracted_bytes, 0, 0x9FD33AE8, 0x1169237E, 0x70263B48, 0x9FD33A, 0x11, 0x1169)
@@ -425,7 +431,6 @@ class MT19937:
             index = self.xor_key ^ self.xor_consts[i]
             stored_value = index_by(self.xor_array, index + 4, 1)
             store_at_index(self.xor_array, index, stored_value ^ key, 1)
-
 
     def get_keys(self):
         keys = []
