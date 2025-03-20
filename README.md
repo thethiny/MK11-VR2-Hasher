@@ -53,6 +53,19 @@ key_3 = xor_3 ^ 0xA4CA9627
 key_4 = xor_4 ^ 0x9414718A
 ```
 
+### ENV File
+An env file called `env.yaml` is expected in the root directory that looks like this:
+```yaml
+# MT
+mt_seed: 0x1571 # default 0x1571
+mt_state_array_seeds: [] # any 8 numbers, used for reproducability. Preferrable to keep empty. # Default empty
+
+# VR2
+access_token: your_access_token_from_mk11
+vr2_seed: 0x291 # default 0x291
+vr2_keys: [] # 4 VR2 keys for reproducability. # Default behavior is calculate the numbers automatically from your access token.
+```
+
 
 ### TODO
-- Move the Keys from MT to VR2
+- Add more tests for they key gen process and other areas that I haven't tested such as the util functions and the string padding
