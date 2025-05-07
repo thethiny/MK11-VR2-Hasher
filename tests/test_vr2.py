@@ -55,3 +55,14 @@ def test_hash_test23_enc_string(vr2_env):
     )
     assert hasher.get_keys() == vr2_env["vr2_keys"]
     assert hasher.hash("test23") == 0x968A01BB
+
+def test_hash_item(vr2_env):
+    hasher = VR2Hasher(
+        hash_seed=vr2_env["vr2_seed"],
+        calculate_randoms=False,
+        encryption_string=vr2_env["access_token"],
+    )
+    item_slug = "Exp_Player"
+    item_ts = "05_11:48:04_0"
+    item_string = item_ts + item_slug
+    assert hex(hasher.hash(item_string)).lower()[2:] == "394958cf" # In-game it compares lowercase strings
